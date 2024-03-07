@@ -12,7 +12,6 @@ class NRS:
         self.general = pd.read_excel(file, sheet_name='general').values
         self.xy = pd.read_excel(file, sheet_name='coordinates').iloc[:, 1:].values
         self.loads = pd.read_excel(file, sheet_name='loads').values
-        print(self.loads)
         self.feeder=self.Ybus()
     def Ybus(self):
 
@@ -54,7 +53,7 @@ class NRS:
 
 
 
-        vs = general[0, 2] * np.exp(np.array([0, -2 * np.pi / 3, 2 * np.pi / 3]) * 1j)  # Vector điện áp của nguồn
+
 
         n_slack = [1, num_n + 1, 2 * num_n + 1]  # Chỉ số của nút nguồn
 
@@ -65,8 +64,9 @@ class NRS:
         feeder['z_line'] = z_line  # Ma trận đặc trưng của đoạn dây
         feeder['ybus'] = ybus  # Ma trận dẫn suất YBus
         feeder['loads'] = self.loads
-        feeder['vs_initial'] = vs  # Vector điện áp nguồn ban đầu
 
+        vs = general[0, 2] * np.exp(np.array([0, -2 * np.pi / 3, 2 * np.pi / 3]) * 1j)  # Vector điện áp của nguồn
+        feeder['vs_initial'] = vs  # Vector điện áp nguồn ban đầu
         feeder['vn_initial'] = np.ones((num_n - 1,1))  # Vector điện áp của các nút ban đầu
 
         feeder['p_base'] = p_base
@@ -95,6 +95,85 @@ class NRS:
             elif ph == 3:
                 s_load[n1 + 2 * num_n - 1] = p + 1j * q
         return s_load
+    def main(self):
+        num_n=self.feeder['num_n']
+        ybus=self.feeder['ybus']
+
+        G = np.real(ybus)
+        B = np.imag(ybus)
+
+        ''''''
+        n_slack=self.feeder['n_slack']
+        n_other=self.feeder['n_other']
+
+        '''get load'''
+        s_load = self.load()
+        sref = -s_load[n_other]
+        pref = np.real(sref)
+        qref = np.imag(sref)
+
+        ''''''
+        v = np.ones(3 * num_n)
+        an = np.zeros(3 * num_n)
+        an[n_other] = np.angle(self.feeder['vn_initial'])
+        an[n_slack] = np.angle(self.feeder['vs_initial'])
+        v[n_slack] = np.abs(self.feeder['vs_initial'])
+
+        err = 100
+        conv = np.zeros(10)
+        iter = 1
+        num_t = 3 * num_n       # tổng nút
+        num_r = len(n_other)    # khac slack
+
+        '''Jacobi'''
+        H = np.zeros((num_t, num_t))
+        N = np.zeros((num_t, num_t))
+        J = np.zeros((num_t, num_t))
+        L = np.zeros((num_t, num_t))
+        while err > 1E-9:
+
+            vn = v * np.exp(an * 1j)
+            sn = vn * np.conj(feeder['ybus'].dot(vn))
+            p = np.real(sn)
+            q = np.imag(sn)
+
+            for k in range(num_t):
+                for m in range(num_t):
+                    if k == m:
+                        H[k, k] = -B[k, k] * v[k] * v[k] - q[k]
+                        N[k, k] = G[k, k] * v[k] + p[k] / v[k]
+                        J[k, k] = -G[k, k] * v[k] * v[k] + p[k]
+                        L[k, k] = -B[k, k] * v[k] + q[k] / v[k]
+                    else:
+                        akm = an[k] - an[m]
+                        N[k, m] = v[k] * (G[k, m] * np.cos(akm) + B[k, m] * np.sin(akm))
+                        L[k, m] = v[k] * (G[k, m] * np.sin(akm) - B[k, m] * np.cos(akm))
+                        H[k, m] = L[k, m] * v[m]
+                        J[k, m] = -N[k, m] * v[m]
+
+
+            dp = pref - p[n_other]
+            dq = qref - q[n_other]
+            Jac = np.block([[H[n_other, n_other], N[n_other, n_other]],
+                            [J[n_other, n_other], L[n_other, n_other]]])
+            dx = np.linalg.solve(Jac, np.concatenate((dp, dq)))
+            an[n_other] += dx[:num_r]
+            v[n_other] += dx[num_r:]
+            err = np.linalg.norm(dx)
+            conv[iter - 1] = err
+            iter += 1
+
+            if iter > 10:
+                print('Phương pháp Newton. Sau 10 lần lặp, sai số là:', err)
+                break
+        vn = v * np.exp(an * 1j)
+        res = {}
+        res['jacobian'] = Jac
+        res['v_node'] = vn
+        res['s_node'] = vn * np.conj(feeder.ybus.dot(vn))
+        res['p_loss'] = np.real(np.sum(res['s_node']))
+        res['error'] = conv
+        res['iter'] = iter
 nrs=NRS('FEEDER901.xlsx')
-print(nrs.load())
+print(nrs.main())
 
