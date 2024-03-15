@@ -67,7 +67,12 @@ class NRS:
 
         vs = general[0, 2] * np.exp(np.array([0, -2 * np.pi / 3, 2 * np.pi / 3]) * 1j)  # Vector điện áp của nguồn
         feeder['vs_initial'] = vs  # Vector điện áp nguồn ban đầu
-        feeder['vn_initial'] = np.ones((num_n - 1,1))  # Vector điện áp của các nút ban đầu
+        vn = np.zeros((3*(num_n-1),1),dtype=complex)
+        for i in range(num_n-1):
+            vn[i]=vs[0]
+            vn[i+num_n-1]=vs[1]
+            vn[i+2*(num_n-1)]=vs[2]
+        feeder['vn_initial'] = vn  # Vector điện áp của các nút ban đầu
 
         feeder['p_base'] = p_base
         feeder['v_base'] = v_base
@@ -108,17 +113,36 @@ class NRS:
 
         '''get load'''
         s_load = self.load()
-        sref = -s_load[n_other]
+        sref=np.zeros((3*(num_n-1),1),dtype=complex)
+        dem=0
+        for i in n_other:
+            sref[dem] = s_load[i-1][0]
+            dem+=1
+        print(sref)
         pref = np.real(sref)
         qref = np.imag(sref)
+        print(pref)
 
-        ''''''
+
+        '''preset'''
         v = np.ones(3 * num_n)
         an = np.zeros(3 * num_n)
-        an[n_other] = np.angle(self.feeder['vn_initial'])
-        an[n_slack] = np.angle(self.feeder['vs_initial'])
-        v[n_slack] = np.abs(self.feeder['vs_initial'])
+        vn_initial=self.feeder['vn_initial']
+        vs_initial=self.feeder['vs_initial']
 
+
+        dem=0
+        for i in n_other:
+            an[i-1] = np.angle(vn_initial[dem])
+            dem += 1
+        dem=0
+        for i in n_slack:
+            an[i-1] = np.angle(vs_initial[dem])
+            v[i-1] = np.abs(vs_initial[dem])
+            dem+=1
+
+        print(an)
+        print(v)
         err = 100
         conv = np.zeros(10)
         iter = 1
@@ -133,23 +157,23 @@ class NRS:
         while err > 1E-9:
 
             vn = v * np.exp(an * 1j)
-            sn = vn * np.conj(feeder['ybus'].dot(vn))
+            sn = vn * np.conj(ybus.dot(vn))
             p = np.real(sn)
             q = np.imag(sn)
 
             for k in range(num_t):
                 for m in range(num_t):
                     if k == m:
-                        H[k, k] = -B[k, k] * v[k] * v[k] - q[k]
-                        N[k, k] = G[k, k] * v[k] + p[k] / v[k]
-                        J[k, k] = -G[k, k] * v[k] * v[k] + p[k]
-                        L[k, k] = -B[k, k] * v[k] + q[k] / v[k]
+                        H[k, k] = -B[k, k] * v[k] * v[k] - q[k]     #J1 check
+                        N[k, k] = G[k, k] * v[k] + p[k] / v[k]      #J2
+                        J[k, k] = -G[k, k] * v[k] * v[k] + p[k]     #J3 check
+                        L[k, k] = -B[k, k] * v[k] + q[k] / v[k]     #J4
                     else:
                         akm = an[k] - an[m]
-                        N[k, m] = v[k] * (G[k, m] * np.cos(akm) + B[k, m] * np.sin(akm))
-                        L[k, m] = v[k] * (G[k, m] * np.sin(akm) - B[k, m] * np.cos(akm))
-                        H[k, m] = L[k, m] * v[m]
-                        J[k, m] = -N[k, m] * v[m]
+                        N[k, m] = v[k] * (G[k, m] * np.cos(akm) + B[k, m] * np.sin(akm))    #J2
+                        L[k, m] = v[k] * (G[k, m] * np.sin(akm) - B[k, m] * np.cos(akm))    #J4
+                        H[k, m] = L[k, m] * v[m]    #J1   J1=J4*v
+                        J[k, m] = -N[k, m] * v[m]   #J3   J3=-J2*v
 
 
             dp = pref - p[n_other]
