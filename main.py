@@ -118,10 +118,9 @@ class NRS:
         for i in n_other:
             sref[dem] = s_load[i-1][0]
             dem+=1
-        print(sref)
+
         pref = np.real(sref)
         qref = np.imag(sref)
-        print(pref)
 
 
         '''preset'''
@@ -141,8 +140,7 @@ class NRS:
             v[i-1] = np.abs(vs_initial[dem])
             dem+=1
 
-        print(an)
-        print(v)
+
         err = 100
         conv = np.zeros(10)
         iter = 1
@@ -157,29 +155,52 @@ class NRS:
         while err > 1E-9:
 
             vn = v * np.exp(an * 1j)
-            sn = vn * np.conj(ybus.dot(vn))
+            abc=np.conj(np.dot(ybus,vn))
+            sn = vn * np.conj(np.dot(vn ,ybus))
             p = np.real(sn)
             q = np.imag(sn)
 
             for k in range(num_t):
                 for m in range(num_t):
                     if k == m:
-                        H[k, k] = -B[k, k] * v[k] * v[k] - q[k]     #J1 check
-                        N[k, k] = G[k, k] * v[k] + p[k] / v[k]      #J2
-                        J[k, k] = -G[k, k] * v[k] * v[k] + p[k]     #J3 check
-                        L[k, k] = -B[k, k] * v[k] + q[k] / v[k]     #J4
+                        H[k, k] = -B[k, k] * v[k] * v[k] - q[k]
+                        N[k, k] = G[k, k] * v[k] + p[k] / v[k]
+                        J[k, k] = -G[k, k] * v[k] * v[k] + p[k]
+                        L[k, k] = -B[k, k] * v[k] + q[k] / v[k]
                     else:
                         akm = an[k] - an[m]
-                        N[k, m] = v[k] * (G[k, m] * np.cos(akm) + B[k, m] * np.sin(akm))    #J2
-                        L[k, m] = v[k] * (G[k, m] * np.sin(akm) - B[k, m] * np.cos(akm))    #J4
-                        H[k, m] = L[k, m] * v[m]    #J1   J1=J4*v
-                        J[k, m] = -N[k, m] * v[m]   #J3   J3=-J2*v
+                        N[k, m] = v[k] * (G[k, m] * np.cos(akm) + B[k, m] * np.sin(akm))
+                        L[k, m] = v[k] * (G[k, m] * np.sin(akm) - B[k, m] * np.cos(akm))
+                        H[k, m] = L[k, m] * v[m]
+                        J[k, m] = -N[k, m] * v[m]
+            dp=np.zeros((num_r,1))
+            dq=np.zeros((num_r,1))
+
+            dem=0
+            for i in n_other:
+                dp[dem] = pref[dem] - p[i-1]
+                dq[dem] = qref[dem] - q[i-1]
+                dem+=1
 
 
-            dp = pref - p[n_other]
-            dq = qref - q[n_other]
-            Jac = np.block([[H[n_other, n_other], N[n_other, n_other]],
-                            [J[n_other, n_other], L[n_other, n_other]]])
+            H = np.delete(H, n_slack, axis=0)
+            H = np.delete(H, n_slack, axis=1)
+            N = np.delete(N, n_slack, axis=0)
+            N = np.delete(N, n_slack, axis=1)
+            J = np.delete(J, n_slack, axis=0)
+            J = np.delete(J, n_slack, axis=1)
+            L = np.delete(L, n_slack, axis=0)
+            L = np.delete(L, n_slack, axis=1)
+
+
+
+            top_row = np.block([[H, N]])
+            bottom_row = np.block([[J, L]])
+            Jac = np.block([[top_row], [bottom_row]])
+            print(Jac)
+
+
+
             dx = np.linalg.solve(Jac, np.concatenate((dp, dq)))
             an[n_other] += dx[:num_r]
             v[n_other] += dx[num_r:]
