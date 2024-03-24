@@ -156,7 +156,9 @@ class NRS:
 
             vn = v * np.exp(an * 1j)
             abc=np.conj(np.dot(ybus,vn))
-            sn = vn * np.conj(np.dot(vn ,ybus))
+            sn = vn * np.conj(np.dot(ybus ,vn))
+
+            print('sn',sn)
             p = np.real(sn)
             q = np.imag(sn)
 
@@ -176,6 +178,30 @@ class NRS:
             dp=np.zeros((num_r,1))
             dq=np.zeros((num_r,1))
 
+            n_slack1=np.zeros((3,1),dtype=int)
+            for i in range(len(n_slack)):
+                n_slack1[i] = n_slack[i]-1
+
+##            n_slack =[0,3,6]
+            H1=H
+            N1=N
+            J1=J
+            L1=L
+
+
+
+
+            H1 = np.delete(H1, n_slack1, axis=0)
+            H1 = np.delete(H1, n_slack1, axis=1)
+            N1 = np.delete(N1, n_slack1, axis=0)
+            N1 = np.delete(N1, n_slack1, axis=1)
+            J1 = np.delete(J1, n_slack1, axis=0)
+            J1 = np.delete(J1, n_slack1, axis=1)
+            L1 = np.delete(L1, n_slack1, axis=0)
+            L1 = np.delete(L1, n_slack1, axis=1)
+
+
+
             dem=0
             for i in n_other:
                 dp[dem] = pref[dem] - p[i-1]
@@ -183,27 +209,25 @@ class NRS:
                 dem+=1
 
 
-            H = np.delete(H, n_slack, axis=0)
-            H = np.delete(H, n_slack, axis=1)
-            N = np.delete(N, n_slack, axis=0)
-            N = np.delete(N, n_slack, axis=1)
-            J = np.delete(J, n_slack, axis=0)
-            J = np.delete(J, n_slack, axis=1)
-            L = np.delete(L, n_slack, axis=0)
-            L = np.delete(L, n_slack, axis=1)
-
-
-
-            top_row = np.block([[H, N]])
-            bottom_row = np.block([[J, L]])
+            top_row = np.block([[H1, N1]])
+            bottom_row = np.block([[J1, L1]])
             Jac = np.block([[top_row], [bottom_row]])
-            print(Jac)
+            Jac = pd.DataFrame(Jac)
 
 
+            np.savetxt('dx.txt', Jac, fmt='%1.7e')
 
-            dx = np.linalg.solve(Jac, np.concatenate((dp, dq)))
-            an[n_other] += dx[:num_r]
-            v[n_other] += dx[num_r:]
+
+            dpq=np.concatenate((dp,dq))
+
+
+            dx = np.linalg.solve(Jac, dpq)
+##            print(dx)
+            dem=0
+            for i in n_other:
+                an[i-1] += dx[dem]
+                v[i-1] += dx[dem+num_r]
+
             err = np.linalg.norm(dx)
             conv[iter - 1] = err
             iter += 1
@@ -215,10 +239,11 @@ class NRS:
         res = {}
         res['jacobian'] = Jac
         res['v_node'] = vn
-        res['s_node'] = vn * np.conj(feeder.ybus.dot(vn))
+        res['s_node'] = vn * np.conj(np.dot(ybus ,vn))
         res['p_loss'] = np.real(np.sum(res['s_node']))
         res['error'] = conv
         res['iter'] = iter
+
 nrs=NRS('FEEDER901.xlsx')
 print(nrs.main())
 
