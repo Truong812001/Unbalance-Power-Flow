@@ -20,8 +20,10 @@ class NRS:
 
         p_base = general[0, 1] / 3  # Công suất danh định theo pha
         v_base = general[0, 0] / np.sqrt(3)  # Điện áp dây đến trung bình
+        print(v_base)
         z_base = v_base**2 / p_base
-
+        print(z_base)
+        print(p_base)
         num_n = int(np.max(np.max(lines[:, :2])))  # Số nút trong mạng
         num_l = len(lines)  # Số đoạn dây
         ybus = np.zeros((3 * num_n, 3 * num_n), dtype=complex)  # Ma trận dẫn suất YBus
@@ -141,6 +143,7 @@ class NRS:
             dem+=1
 
 
+
         err = 100
         conv = np.zeros(10)
         iter = 1
@@ -152,13 +155,16 @@ class NRS:
         N = np.zeros((num_t, num_t))
         J = np.zeros((num_t, num_t))
         L = np.zeros((num_t, num_t))
+        ybus=pd.DataFrame(ybus)
+        np.savetxt('ybus.txt', ybus, fmt='%1.7e')
         while err > 1E-9:
 
             vn = v * np.exp(an * 1j)
             abc=np.conj(np.dot(ybus,vn))
+            np.savetxt('abc.txt', abc, fmt='%1.7e')
             sn = vn * np.conj(np.dot(ybus ,vn))
-
-            print('sn',sn)
+##            print('vn',vn)
+##            print('sn',sn)
             p = np.real(sn)
             q = np.imag(sn)
 
@@ -207,26 +213,39 @@ class NRS:
                 dp[dem] = pref[dem] - p[i-1]
                 dq[dem] = qref[dem] - q[i-1]
                 dem+=1
-
+            np.savetxt('pref.txt', pref, fmt='%1.7e')
+            np.savetxt('qref.txt', qref, fmt='%1.7e')
+##            print(pref)
+##            print(qref)
+##            print(p)
+##            print(q)
+            dpq=np.concatenate((dp,dq))
+            np.savetxt('dpq.txt', dpq, fmt='%1.7e')
 
             top_row = np.block([[H1, N1]])
             bottom_row = np.block([[J1, L1]])
             Jac = np.block([[top_row], [bottom_row]])
             Jac = pd.DataFrame(Jac)
+            np.savetxt('Jac.txt', Jac, fmt='%1.7e')
 
 
-            np.savetxt('dx.txt', Jac, fmt='%1.7e')
 
 
-            dpq=np.concatenate((dp,dq))
+
+
 
 
             dx = np.linalg.solve(Jac, dpq)
-##            print(dx)
+            np.savetxt('dx.txt', dx, fmt='%1.7e')
             dem=0
             for i in n_other:
                 an[i-1] += dx[dem]
                 v[i-1] += dx[dem+num_r]
+                dem+=1
+            np.savetxt('an.txt', an, fmt='%1.7e')
+            np.savetxt('v.txt', v, fmt='%1.7e')
+
+
 
             err = np.linalg.norm(dx)
             conv[iter - 1] = err
@@ -243,7 +262,7 @@ class NRS:
         res['p_loss'] = np.real(np.sum(res['s_node']))
         res['error'] = conv
         res['iter'] = iter
-
+        print(res)
 nrs=NRS('FEEDER901.xlsx')
 print(nrs.main())
 
