@@ -1,3 +1,6 @@
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
+
 import pandas as pd
 import numpy as np
 import cmath
@@ -6,25 +9,28 @@ import openpyxl
 class NRS:
 
     def __init__(self,file):
-
+        self.data_excel(file)
+        return
+    def data_excel(self,file):
         # Đọc dữ liệu từ file Excel
         self.lines = pd.read_excel(file, sheet_name='lines').values
         self.codes = pd.read_excel(file, sheet_name='line_codes').values
         self.general = pd.read_excel(file, sheet_name='general').values
         self.xy = pd.read_excel(file, sheet_name='coordinates').iloc[:, 1:].values
         self.loads = pd.read_excel(file, sheet_name='loads').values
-        self.shunt = pd.read_excel(file, sheet_name='shunt').values
-        self.cap = pd.read_excel(file, sheet_name='capacitor_bank').values
+##        self.shunt = pd.read_excel(file, sheet_name='shunt').values
+##        self.cap = pd.read_excel(file, sheet_name='capacitor_bank').values
         self.feeder=self.Ybus()
+        return
     def Ybus(self):
 
         '''get data'''
-        lines, codes, general, xy ,shunt = self.lines, self.codes, self.general, self.xy, self.shunt
+        lines, codes, general, xy  = self.lines, self.codes, self.general, self.xy
 
         p_base = general[0, 1] / 3  # Công suất danh định theo pha
 ##        print(p_base)
         v_base = general[0, 0] / np.sqrt(3)  # Điện áp dây đến trung bình
-##        print(v_base)
+        print(v_base)
         z_base = v_base**2 / p_base
 ##        print(z_base)
 ##        print(p_base)
@@ -120,6 +126,7 @@ class NRS:
                 s_load[n1 + num_n - 1] = p + 1j * q
             elif ph == 3:
                 s_load[n1 + 2 * num_n - 1] = p + 1j * q
+        print(s_load)
         return s_load
 
 
@@ -279,7 +286,7 @@ class NRS:
             b.append(v[i+num_n])
             c.append(v[i+2*num_n])
         df = pd.DataFrame({'Phase a': a, 'Phase b': b, 'Phase c': c})
-
+        print(df)
         # Lưu dataframe ra file Excel
         df.to_excel("output.xlsx", index=False)
 nrs=NRS('FEEDER901.xlsx')

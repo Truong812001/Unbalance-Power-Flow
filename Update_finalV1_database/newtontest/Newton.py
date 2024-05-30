@@ -64,9 +64,9 @@ class NRS:
             print("get_database",self.data)
         self.feeder = self.Ybus()
     def data_excel(self,file):
-        
+
         res ={}
-        
+
         res1 = {
             "No": [],
             "Frombus": [],
@@ -84,7 +84,7 @@ class NRS:
             res1["LineCode"].append(row[4])
 
         res['LINE'] = res1
-    
+
 
         codes = pd.read_excel(file, sheet_name='line_codes').values
 
@@ -104,7 +104,7 @@ class NRS:
             res1["X1(Ohm/km)"].append(row[2])
             res1["R0(Ohm/km)"].append(row[3])
             res1["X0(Ohm/km)"].append(row[4])
-        res['LINE_CODE'] = res1  
+        res['LINE_CODE'] = res1
 
         loads = pd.read_excel(file, sheet_name='loads').values
 
@@ -129,7 +129,7 @@ class NRS:
             res1["Phase C (kW)"].append(row[5])
             res1["Phase C (kVar)"].append(row[6])
         res['LOADS'] = res1
-        
+
         general = pd.read_excel(file, sheet_name='general').values
 
         # Khởi tạo từ điển res1 với các danh sách rỗng
@@ -144,8 +144,17 @@ class NRS:
             res1["Voltage (kV)"].append(row[0])
             res1["Nominal Power (MW)"].append(row[1])
             res1["Voltage at subestation (pu)"].append(row[2])
+        res['GEN'] = res1
 
-        res['GEN'] = res1    
+        capacitor_bank = pd.read_excel(file, sheet_name='capacitor_bank').values
+        res1 = {
+             "No": [],
+             "Q (kVar)" : []
+        }
+        for row in capacitor_bank:
+             res1["No"].append(row[0])
+             res1["Q (kVar)"].append(row[1])
+        res['CAPACITOR_BANK'] = res1
         return res
 
 
@@ -153,24 +162,24 @@ class NRS:
 
         '''get data'''
 
-        '''{'GEN': {'Voltage (kV)': [0.416], 'Nominal Power (MW)': [0.8], 
-                 'Voltage at subestation (pu)': [1.05]}, 
-         'LINE': {'No': [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11], 
-                  'Frombus': [1, 2, 3, 4, 5, 2, 7, 9, 9, 10, 5], 
-                  'Tobus': [2, 3, 4, 5, 6, 7, 4, 10, 12, 11], 
-                  'Length': [1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0], 
-                  'LineCode': ['AC-70', 'AC-80', 'AC-70', 'AC-80', 'AC-90', 'AC-70', 'AC-80', 'AC-90', 'AC-90', 'AC-80', 'AC-80']}, 
-        'LINE_CODE': {'NAME': ['AC-70', 'AC-80', 'AC-90'], 
-                      'R1(Ohm/km)': [0.63, 0.735, 0.525], 
-                      'X1(Ohm/km)': [1.23, 1.435, 1.025], 
-                      'R0(Ohm/km)': [0.63, 0.735, 0.525], 
-                      'X0(Ohm/km)': [1.23, 1.435, 1.025]}, 
-        'LOADS': {'BUS': [2], 'Phase A (kW)': [0.861], 'Phase A (kVar)': [0.122997], 
-                  'Phase B (kW)': [0.861], 'Phase B (kVar)': [0.122997], 
+        '''{'GEN': {'Voltage (kV)': [0.416], 'Nominal Power (MW)': [0.8],
+                 'Voltage at subestation (pu)': [1.05]},
+         'LINE': {'No': [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11],
+                  'Frombus': [1, 2, 3, 4, 5, 2, 7, 9, 9, 10, 5],
+                  'Tobus': [2, 3, 4, 5, 6, 7, 4, 10, 12, 11],
+                  'Length': [1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0],
+                  'LineCode': ['AC-70', 'AC-80', 'AC-70', 'AC-80', 'AC-90', 'AC-70', 'AC-80', 'AC-90', 'AC-90', 'AC-80', 'AC-80']},
+        'LINE_CODE': {'NAME': ['AC-70', 'AC-80', 'AC-90'],
+                      'R1(Ohm/km)': [0.63, 0.735, 0.525],
+                      'X1(Ohm/km)': [1.23, 1.435, 1.025],
+                      'R0(Ohm/km)': [0.63, 0.735, 0.525],
+                      'X0(Ohm/km)': [1.23, 1.435, 1.025]},
+        'LOADS': {'BUS': [2], 'Phase A (kW)': [0.861], 'Phase A (kVar)': [0.122997],
+                  'Phase B (kW)': [0.861], 'Phase B (kVar)': [0.122997],
                   'Phase C (kW)': [0.861], 'Phase C (kVar)': [0.122997]}}'''
 
         p_base = self.data['GEN']['Nominal Power (MW)'][0] / 3  # Công suất danh định theo pha
-     
+
         v_base = self.data['GEN']['Voltage (kV)'][0] / np.sqrt(3)  # Điện áp dây đến trung bình
 
         z_base = v_base**2 / p_base
@@ -189,7 +198,6 @@ class NRS:
             # len_ /= 1000  # kilômét
 
             line_code_data = self.data['LINE_CODE']
-            line_name = 'AC-70'
             if cde in line_code_data['NAME']:
                 index = line_code_data['NAME'].index(cde)
                 r1 = line_code_data['R1(Ohm/km)'][index] * len_
@@ -241,7 +249,7 @@ class NRS:
 
         feeder['z_line'] = z_line  # Ma trận đặc trưng của đoạn dây
         feeder['ybus'] = ybus  # Ma trận dẫn suất YBus
-        
+
 
         vs = self.data['GEN']['Voltage at subestation (pu)'][0] * np.exp(np.array([0, -2 * np.pi / 3, 2 * np.pi / 3]) * 1j)  # Vector điện áp của nguồn
         feeder['vs_initial'] = vs  # Vector điện áp nguồn ban đầu
@@ -270,7 +278,7 @@ class NRS:
             qb=load['Phase B (kVar)'][i]
             pc=load['Phase C (kW)'][i]
             qc=load['Phase C (kVar)'][i]
-            # self.feeder['p_base']*1000    
+            # self.feeder['p_base']*1000
             n1 = int(load['BUS'][i])
             s_load[n1 - 1] = -(pa + 1j * qa)/(self.data['GEN']['Nominal Power (MW)'][0]*1000)
             s_load[n1 + num_n - 1] = -(pb + 1j * qb)/(self.data['GEN']['Nominal Power (MW)'][0]*1000)
@@ -281,8 +289,19 @@ class NRS:
     def main(self):
         num_n=self.feeder['num_n']
         ybus=self.feeder['ybus']
+##        ybus = np.array([[ 0.15834119-0.29872565j, -0.15834119+0.30914232j,  0.        +0.j,
+##                   0.        +0.j,          0.        +0.j,          0.        +0.j],
+##                 [-0.15834119+0.30914232j,  0.15834119-0.30914232j,  0.        +0.j,
+##                   0.        +0.j,          0.        +0.j,          0.        +0.j],
+##                 [ 0.        +0.j,          0.        +0.j,          0.15834119-0.30914232j,
+##                  -0.15834119+0.30914232j,  0.        +0.j,          0.        +0.j],
+##                 [ 0.        +0.j,          0.        +0.j,         -0.15834119+0.30914232j,
+##                   0.15834119-0.30914232j,  0.        +0.j,          0.        +0.j],
+##                 [ 0.        +0.j,          0.        +0.j,          0.        +0.j,
+##                   0.        +0.j,          0.15834119-0.30914232j, -0.15834119+0.30914232j],
+##                 [ 0.        +0.j,          0.        +0.j,          0.        +0.j,
+##                   0.        +0.j,         -0.15834119+0.30914232j,  0.15834119-0.30914232j]])
 
-        np.savetxt('ybus.txt', ybus, fmt='%1.7e')
         G = np.real(ybus)
         B = np.imag(ybus)
 
@@ -387,19 +406,13 @@ class NRS:
                 dp[dem] = pref[dem] - p[i-1]
                 dq[dem] = qref[dem] - q[i-1]
                 dem+=1
-            np.savetxt('pref.txt', pref, fmt='%1.7e')
-            np.savetxt('qref.txt', qref, fmt='%1.7e')
             dpq=np.concatenate((dp,dq))
-            np.savetxt('dpq.txt', dpq, fmt='%1.7e')
-
             top_row = np.block([[H1, N1]])
             bottom_row = np.block([[J1, L1]])
             Jac = np.block([[top_row], [bottom_row]])
             Jac = pd.DataFrame(Jac)
-            np.savetxt('Jac.txt', Jac, fmt='%1.7e')
 
             dx = np.linalg.solve(Jac, dpq)
-            np.savetxt('dx.txt', dx, fmt='%1.7e')
             dem=0
             for i in n_other:
                 an[i-1] += dx[dem]
@@ -421,7 +434,7 @@ class NRS:
         res['p_loss'] = np.real(np.sum(res['s_node']))
         res['error'] = conv
         res['iter'] = iter
- 
+
         return res,v
     def report(self):
         res,v=self.main()
@@ -439,7 +452,7 @@ class NRS:
         df.to_excel("output.xlsx", index=False)
 
 if __name__ == '__main__' :
-    file =r'FEEDER901xx.xlsx'
+    file =r'FEEDER901x.xlsx'
     db_file = r'data.db'
     nrs=NRS(file,db_file)
     res=nrs.report()
